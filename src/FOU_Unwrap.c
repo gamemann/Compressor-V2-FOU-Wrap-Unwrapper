@@ -64,5 +64,47 @@ int tc_unwrap(struct __sk_buff *skb)
         return TC_ACT_SHOT;
     }
 
+    // Reinitialize data and data end.
+    data = (void *)(long)(skb->data);
+    data_end = (void *)(long)(skb->data_end);
+
+    // Initiailize inner IP header.
+    struct iphdr *ip = (data + sizeof(struct ethhdr));
+
+    // Check inner IP header.
+    if (unlikely(ip + 1 > (struct iphdr *)data_end))
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Initialize inner UDP header.
+    struct udphdr *udp = (data + sizeof(struct udphdr) + (ip->ihl * 4));
+
+    // Check inner UDP header.
+    if (udp + 1 > (struct udphdr *)data_end)
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Get forwarding/Anycast address from map.
+    uint32_t key = 0;
+    uint32_t *addr = bpf_map_lookup_elem(&ip_map, &key);
+
+    // Check if BPF map value is valid.
+    if (!addr)
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Change inner IP header's source address to forwarding/Anycast address and save old address for checksum recalculation.
+    uint32_t oldAddr = ip->saddr;
+    ip->saddr = *addr;
+
+    // Recalculate inner IP header's checksum.
+    bpf_l3_csum_replace(skb, (sizeof (struct ethhdr) + offsetof(struct iphdr, check)), oldAddr, ip->saddr, sizeof(uint32_t));
+
+    // Recalculate inner UDP header's checksum.
+    bpf_l4_csum_replace(skb, (sizeof(struct ethhdr) + (ip->ihl * 4) + offsetof(struct udphdr, check)), oldAddr, ip->saddr, 0x10 | sizeof(uint32_t));
+
     return TC_ACT_OK;
 }
