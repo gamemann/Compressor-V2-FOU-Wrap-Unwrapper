@@ -32,7 +32,7 @@ struct bpf_elf_map
     __u32 inner_idx;
 };
 
-// MAC map for gateway interface's MAC address. The program only worked for me if I had the Ethernet header's destination MAC address set to the gateway.
+// Map for Anycast/forwarding IP address.
 struct bpf_elf_map SEC("maps") ip_map =
 {
     .type = BPF_MAP_TYPE_ARRAY,
