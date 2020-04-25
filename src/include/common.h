@@ -1,5 +1,4 @@
 #include <inttypes.h>
-#include <limits.h>
 
 #ifdef __BPF__
 #define SEC(NAME) __attribute__((section(NAME), used))
