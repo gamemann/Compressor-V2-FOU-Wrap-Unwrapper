@@ -17,21 +17,6 @@
 #include "include/bpf_helpers.h"
 #include "include/common.h"
 
-#define PIN_GLOBAL_NS 2
-
-struct bpf_elf_map 
-{
-    __u32 type;
-    __u32 size_key;
-    __u32 size_value;
-    __u32 max_elem;
-    __u32 flags;
-    __u32 id;
-    __u32 pinning;
-    __u32 inner_id;
-    __u32 inner_idx;
-};
-
 // Map for Anycast/forwarding IP address.
 struct bpf_elf_map SEC("maps") ip_map =
 {

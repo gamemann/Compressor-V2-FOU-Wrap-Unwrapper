@@ -93,6 +93,21 @@ struct bpf_map_def {
 	unsigned int inner_map_idx;
 };
 
+#define PIN_GLOBAL_NS 2
+
+struct bpf_elf_map 
+{
+    __u32 type;
+    __u32 size_key;
+    __u32 size_value;
+    __u32 max_elem;
+    __u32 flags;
+    __u32 id;
+    __u32 pinning;
+    __u32 inner_id;
+    __u32 inner_idx;
+};
+
 static int (*bpf_skb_load_bytes)(void *ctx, int off, void *to, int len) =
 	(void *) BPF_FUNC_skb_load_bytes;
 static int (*bpf_skb_store_bytes)(void *ctx, int off, void *from, int len, int flags) =
