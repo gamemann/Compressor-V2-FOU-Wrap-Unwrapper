@@ -20,6 +20,7 @@ You may delete existing filters via:
 
 ```
 tc filter del dev $DEV ingress
+```
 
 ## Exclude game server traffic.
 We want to exclude game server traffic. Therefore, we'll need to add a rule for each game server such as the following:
