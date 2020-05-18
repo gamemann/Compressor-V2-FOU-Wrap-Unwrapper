@@ -78,3 +78,10 @@ iptables -t nat -A POSTROUTING -s 172.2.0.0/16 -j MASQUERADE
 ```
 
 **Note** - This may not be needed.
+
+## Add FOU Port Inside Namespace
+You'll need to add the FOU port inside of the namespace via:
+
+```
+ip netns exec $NSNAME ip fou add port 1337 ipproto 4
+```
