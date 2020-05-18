@@ -135,6 +135,40 @@ int tc_wrap(struct __sk_buff *skb)
     uint32_t oldAddr = inner_ip->daddr;
     inner_ip->daddr = info->internalIP;
 
+    // Recalculate inner IP header's checksum.
+    bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + offsetof(struct iphdr, check), oldAddr, inner_ip->daddr, sizeof(inner_ip->daddr));
+
+    // Reinitialize data and data_end.
+    data = (void *)(long)(skb->data);
+    data_end = (void *)(long)(skb->data_end);
+
+    // Reinitialize outer IP header.
+    ip = data + sizeof(struct ethhdr);
+
+    // Check outer IP header.
+    if (unlikely(ip + 1 > (struct iphdr *)data_end))
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Reinitialize outer UDP header.
+    udp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
+
+    // Check outer UDP header.
+    if (udp + 1 > (struct udphdr *)data_end)
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Reinitialize inner IP header.
+    inner_ip = data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr);
+
+    // Check inner IP header.
+    if (unlikely(inner_ip + 1 > (struct iphdr *)data_end))
+    {
+        return TC_ACT_SHOT;
+    }
+
     // Fill out outer IP header.
     ip->ihl = 5;
     ip->version = 4;
