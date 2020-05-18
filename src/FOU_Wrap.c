@@ -188,7 +188,7 @@ int tc_wrap(struct __sk_buff *skb)
             }
 
             // Assign payload size.
-            payloadSize = ntohs(inner_ip->tot_len) - (inner_tcp->doff * 4) - (inner_ip->ihl * 4);
+            payloadSize = ntohs(inner_ip->tot_len) - (inner_ip->ihl * 4);
 
             // Recalculate inner TCP header checksum.
             bpf_l4_csum_replace(skb, sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + (inner_ip->ihl * 4)  + offsetof(struct tcphdr, check), oldAddr, inner_ip->daddr, 0x10 | sizeof(inner_ip->daddr));
@@ -233,7 +233,7 @@ int tc_wrap(struct __sk_buff *skb)
     #endif
 
     // Fill out outer UDP header.
-    udp->len = htons(sizeof(struct udphdr) + payloadSize);
+    udp->len = htons(payloadSize + sizeof(struct udphdr) + sizeof(struct iphdr));
     udp->source = info->port;
     udp->dest = info->port;
 
