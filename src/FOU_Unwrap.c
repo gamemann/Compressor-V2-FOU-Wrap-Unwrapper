@@ -14,34 +14,14 @@
 #define __BPF__
 #endif
 
-//#define DEBUG
+#define DEBUG
 
 #include "include/bpf_helpers.h"
 #include "include/common.h"
 
-// Map for Anycast/forwarding IP address.
-struct bpf_elf_map SEC("maps") ip_map =
-{
-    .type = BPF_MAP_TYPE_ARRAY,
-    .size_key = sizeof(uint32_t),
-    .size_value = sizeof(uint32_t),
-    .max_elem = 1,
-    .pinning = PIN_GLOBAL_NS
-};
-
 SEC("unwrap")
 int tc_unwrap(struct __sk_buff *skb)
 {
-    // Get forwarding/Anycast address from map.
-    uint32_t key = 0;
-    uint32_t *addr = bpf_map_lookup_elem(&ip_map, &key);
-
-    // Check if BPF map value is valid.
-    if (!addr)
-    {
-        return TC_ACT_OK;
-    }
-
     // Initialize SKB data and data end.
     void *data = (void *)(long)(skb->data);
     void *data_end = (void *)(long)(skb->data_end);
@@ -51,6 +31,33 @@ int tc_unwrap(struct __sk_buff *skb)
     
     // Check if ethernet header is invalid (unlikely).
     if (unlikely(eth + 1 > (struct ethhdr *)data_end))
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Initialize outer IP header.
+    struct iphdr *ip = data + sizeof(struct ethhdr);
+
+    // Check outer IP header.
+    if (ip + 1 > (struct iphdr *)data_end)
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Save destination address.
+    uint32_t addr = ip->daddr;
+
+    // Initialize inner IP header.
+    struct iphdr *inner_ip = data + sizeof(struct ethhdr) + (ip->ihl * 4) + sizeof(struct udphdr);
+
+    // Check inner IP header.
+    if (inner_ip + 1 > (struct iphdr *)data_end)
+    {
+        return TC_ACT_SHOT;
+    }
+
+    // Only accept UDP and TCP protocols.
+    if (unlikely(inner_ip->protocol != IPPROTO_UDP && inner_ip->protocol != IPPROTO_TCP))
     {
         return TC_ACT_SHOT;
     }
@@ -65,8 +72,8 @@ int tc_unwrap(struct __sk_buff *skb)
     data = (void *)(long)(skb->data);
     data_end = (void *)(long)(skb->data_end);
 
-    // Initiailize inner IP header.
-    struct iphdr *ip = data + sizeof(struct ethhdr);
+    // Reinitiailize outer IP header (the inner IP header before).
+    ip = data + sizeof(struct ethhdr);
 
     // Check inner IP header.
     if (unlikely(ip + 1 > (struct iphdr *)data_end))
@@ -74,15 +81,9 @@ int tc_unwrap(struct __sk_buff *skb)
         return TC_ACT_SHOT;
     }
 
-    // Only accept UDP and TCP protocols.
-    if (unlikely(ip->protocol != IPPROTO_UDP && ip->protocol != IPPROTO_TCP))
-    {
-        return TC_ACT_SHOT;
-    }
-
-    // Change inner IP header's source address to forwarding/Anycast address and save old address for checksum recalculation.
+    // Save old source address and change it.
     uint32_t oldAddr = ip->saddr;
-    ip->saddr = *addr;
+    ip->saddr = addr;
 
     // Recalculate inner IP header's checksum.
     bpf_l3_csum_replace(skb, sizeof (struct ethhdr) + offsetof(struct iphdr, check), oldAddr, ip->saddr, sizeof(ip->saddr));
@@ -108,10 +109,6 @@ int tc_unwrap(struct __sk_buff *skb)
     {
         return TC_ACT_SHOT;
     }
-
-    #ifdef DEBUG
-        printk("Source host => %" PRIu32 ". Dest host => %" PRIu32 "\n", ip->saddr, ip->daddr);
-    #endif
 
     uint8_t sMAC[ETH_ALEN];
     uint8_t dMAC[ETH_ALEN];
@@ -145,6 +142,10 @@ int tc_unwrap(struct __sk_buff *skb)
     {
         return TC_ACT_SHOT;
     }
+
+    #ifdef DEBUG
+        printk("Source host => %" PRIu32 ". Dest host => %" PRIu32 "\n", ip->saddr, ip->daddr);
+    #endif
 
     // Layer 4 header checksum recalculation.
     switch (ip->protocol)
