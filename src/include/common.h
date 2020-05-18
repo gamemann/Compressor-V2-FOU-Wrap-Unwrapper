@@ -26,6 +26,8 @@
 #endif
 #endif
 
+#define bpf_memcpy __builtin_memcpy
+
 #ifndef offsetof
 # define offsetof(TYPE, MEMBER)	((uint16_t)&((TYPE *)0)->MEMBER)
 #endif
