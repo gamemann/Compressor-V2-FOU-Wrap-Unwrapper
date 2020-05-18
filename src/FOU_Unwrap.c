@@ -14,7 +14,7 @@
 #define __BPF__
 #endif
 
-#define DEBUG
+//#define DEBUG
 
 #include "include/bpf_helpers.h"
 #include "include/common.h"
